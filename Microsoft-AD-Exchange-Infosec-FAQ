@@ -1,0 +1,115 @@
+MS basic on-premises infrastructure FAQ: AD/Exchange/Infosec
+
+MS Active Directory:
+
+1.1 Use RBAC access in every task. If you even need to grant access for ONE object (printer/folder/etc.) to ONE user/account – create AD Security Group for it (if wasn’t created before), and grant access via a group.
+Like that: https://www.netwrix.com/ntfs_permissions_management.html
+
+1.2 Do not delete objects in AD. I can assure you, that John Doe’s account, disabled (and not deleted) after he left the job – will be very helpful even after 2-3-* years for legal, forensics or any other reason.
+
+1.3 Instead of – create and deploy AD objects and contents lifecycle regime. Creating, using, disabling, moving to special OU’s, archiving all linked contents (email, docs, etc.) Basic IDM cycle, automate, if you know what I mean). Next level, of course, fully managed IDM with logging ALL history of all objects (add/delete from groups, accesses, etc.)
+
+1.4 Use JEA (Just Enough Administration) whenever possible. Just use it)
+Minimal config:
+WA – workstation admins, helpdesk
+SA – different server admins
+EA – MS Exchange admins
+DA – domain admins
+And all other staff from MS Tiering security approach.
+
+1.5 If using dynamic security and distribution groups — do it with accuracy. Be familiar with recipients filter engine, and source IDM systems for AD attributes and OU’s. Or one morning you’ll get a surprise)
+
+1.6 Always use LAPS where possible, even for servers: https://docs.microsoft.com/en-us/defender-for-identity/cas-isp-laps
+
+1.7 Always deploy minimal AD security hardening: mimikatz defence (example: https://www.atraining.ru/mimikatz-lsa-protection/), anti-PtH methods, etc.
+
+1.8 If you’re advanced ) – deploy and use SAW (secure admin workstations) approach, not common ‘managing servers’: https://www.microsoft.com/en-us/itshowcase/protecting-high-risk-environments-with-secure-admin-workstations
+
+
+1.9 Passwords))) In 2021 NIST said that now we do not need to change them in 90 days.
+https://securityboulevard.com/2021/03/nist-password-guidelines-2021-challenging-traditional-password-management/
+
+But…
+Just:
+— change them in 30-60-90-etc days, with all other basic controls.
+— use MFA where possible, because the pwd itself is not a defense at all.
+
+Infra common:
+
+2.1 Do not use RAID 5/6 for all tasks. Always remember: sometimes RAID 1 or 10 is enough, and recovering 5/6 raids during business hours can be very painful.
+
+2.2 Do not use ‘non-production’ technologies in production infra. Like S2D, etc. Instead of – use good old storage systems) /shame on me, I know )
+
+2.3 Remember!
+• Simple backup job marked as ‘green’ – is not a backup at all.
+• Backup with contents verified by read – also is not a backup yet.
+• Backup with contents verified, restore process verified and check, RTO/RPO/DRP processes deployed – is a REAL backup.
+
+MS Exchange:
+
+3.1 Remember! MINIMUM remote site Exchange setup is a DAG with 2 members. Not a one standalone server.
+
+3.2 Before deploying any setups – calculate, calculate, calculate. Use Exchange calculator or your own experience.
+On sites with any planned Exchange client load above minimal – use separate Exchange roles approach.
+I mean – use two different pools of servers: for all CAS functions and for MBX DAG’s. Easy to troubleshoot, etc.
+
+3.3 If using antivirus software with real-time file monitoring on Exchange – always deploy a list of exclusions.
+This script will help you: https://github.com/cunninghamp/ExchangeServerAntivirusExclusions
+Docs (common):  https://docs.microsoft.com/ru-ru/exchange/antispam-and-antimalware/windows-antivirus-software?view=exchserver-2019
+Discussion: https://practical365.com/exchange-2016-antivirus-exclusions/
+
+3.4 Typical installation errors: https://blog.rmilne.ca/2013/12/05/6-mistakes-to-avoid-with-exchange-2013-cu-command-line-installations/
+
+3.5 Before adding new members to DAG groups – I recommend you manually install the Failover Clustering server feature.
+
+3.6 Using virtualization – always know and try to use all vendors guides and recommendations.
++ full guide: https://www.vmware.com/content/dam/digitalmarketing/vmware/en/pdf/solutions/business-critical-apps/exchange/vmw-microsoft-exchange-server-2019-on-vmware-best-practices.pdf
+
+For example, VMWare: vx3net and PVSCSI controllers only, NOT dynamic disks/memory, DRS rule for placing DAG members on different hosts, etc.
+For example, network tuning on OS level: https://kb.vmware.com/s/article/2039495
+
+3.7 Using VSS backups? NEVER! Never schedule more than 1 DAG member for backup at one time. Or you will get the cluster ‘split brain’.
+A great article for DAG/Veeam maintenance and tuning: http://andyandthevms.com/exchange-dag-vmware-backups-updated-list-of-tips-and-tricks-for-veeam-backup-replication/
+
+3.8 When troubleshooting – always remember to check more simple reasons first. Backpressure (disk/CPU/RAM exhausting), SSL certs issues (especially Exchange IIS Backend Site cert issues), network. These are 80-90% of outage reasons.
+
+3.9 When installing a new Exchange server in AD site with Exchange clients – always remember about Autodiscover issues.
+Please read carefully, in Russian, by MS Senior PFE Victoria Gindosova: https://www.facebook.com/groups/exchangeserverru/posts/1700457763402841
+Also, besides above – you need to open TCP 443 port from ALL client networks not only to your Load Balancers – but to a new servers too. If not – you can get some of the client’s Outlook profiles completely broken, without possibility to fix, only recreate.
+
+3.10 Always remember about network TCP idle controls, like described here in p. 1 and 9
+https://docs.microsoft.com/en-us/archive/blogs/david231/for-exchange-2010-and-2013-do-this-before-calling-microsoft
+
+3.11 Always try to use simple, same, well-documented base config across the org:
+• all possible logs and queue files, if needed – to non-system disk
+• schedule cleaning logs if needed
+• remember – during mailbox migrations the amount of logs is increasing a lot
+
+3.12 Do not change Exchange default receive connectors settings. Also, remember that all custom created anonymous, etc. receive connectors – must be created on FRONTEND, not HUB, component:
+https://practical365.com/exchange-2016-smtp-relay-connector/
+
+If not – you’ll get a great deep dive in internal SMTP troubleshooting.
+
+3.13 Do not use large databases, more than 1-2Tb, even with DAG. Especially, if you’re using VSS backups. Remember about RTO for business. Copy and ESEUTIL for 2Tb database on non-SSD disks – will take some time.
+
+3.14 Use DNS RR, Load balancers, but remember – a good old NLB approach is still working fine for CAS pools)
+
+3.15 Be familiar with ‘search-mailbox’ query syntax.
+https://www.codetwo.com/admins-blog/search-mailbox-exchange-2013-2016-online-attributes/
+
+Sure, it was created by non-humans for non-humans, but be familiar)
+
+3.16 Never use MBR disks for mailbox databases.
+
+3.17 Be familiar with ‘WHITESPACE’ and common ‘WE NEED TO DECREASE .EDB FILE SIZE ASAP’ tasks)
+
+3.18 Try to never told your Infosec Dpt about how Exchange caching creds for OWA and ActiveSync:
+https://docs.microsoft.com/en-us/archive/blogs/messaging_with_communications/part-i-disabled-accounts-and-activesync-devices-continuing-to-sync
+https://docs.microsoft.com/en-us/archive/blogs/messaging_with_communications/part-ii-disabled-accounts-and-users-still-being-able-to-access-via-outlook-owa
+Or they eat you alive)
+
+3.19 Be familiar with common attacks against Exchange, like Backscatter, etc.
+In Russian:
+https://www.youtube.com/watch?v=kpt4tp4_A8Q
+
+To be continued…
